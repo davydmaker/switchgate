@@ -9,19 +9,11 @@ Some Nintendo Switch games are available as [Cloud Versions](https://pt-americas
 
 With SwitchGate, you connect your PC to a VPN server in the supported region and route the Switch traffic through it. This way the Switch gets both **access** to the cloud game and a **low-latency route** to the streaming server.
 
-### Virtual LAN with Friends (Hamachi, Radmin VPN, ZeroTier, etc.)
-Connect your PC to a virtual LAN tool and use SwitchGate to bridge your Switch into that network. This unlocks **local connection features** over the internet:
-
-- **Local wireless play** - Play games that support local multiplayer as if your friends were in the same room
-- **Game sharing** - Use the Switch's game share feature with friends on the virtual LAN
-- **Game lending** - Lend digital games to friends through local connection
-- **Local network features in games** - For example, use the Union Room in **Pokemon FireRed/LeafGreen** (via NSO) for battles and trades over the internet, or local co-op in **Monster Hunter Rise**, **Mario Kart 8**, and many others
-
-### Access Home Network Services
-Route your Switch through a PC that's connected to your home VPN (WireGuard, OpenVPN) while you're away, giving the Switch access to local network game servers or NAS media.
-
 ### Network Debugging
 Monitor and log all HTTP/HTTPS traffic from your Switch for troubleshooting connectivity issues. All connections are logged to `proxy.log`.
+
+### Looking for Local Play over the Internet?
+If you want to use **local multiplayer**, **game sharing**, or **LAN play** features with remote friends (via Hamachi, Radmin VPN, ZeroTier, etc.), SwitchGate is not the right tool — an HTTP proxy only handles web traffic, not the UDP broadcast/multicast packets the Switch uses for local discovery. Check out [switch-lan-play](https://github.com/spacemeowx2/switch-lan-play) instead, which works at the network layer to bridge Switches across the internet.
 
 ## Quick Start
 
