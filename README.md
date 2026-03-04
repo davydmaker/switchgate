@@ -68,8 +68,11 @@ If you prefer not to use Python, platform-specific standalone scripts are availa
 ./standalone/switchgate-linux.sh
 
 # Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -File standalone\switchgate-windows.ps1
+.\standalone\switchgate-windows.ps1
 ```
+
+> **Note:** If you get a script execution error on Windows, run:
+> `powershell -ExecutionPolicy Bypass -File standalone\switchgate-windows.ps1`
 
 ## How It Works
 

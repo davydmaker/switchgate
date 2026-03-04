@@ -233,7 +233,7 @@ try {
 Write-Log "Proxy started on port $ProxyPort" "Green"
 Show-SwitchConfig
 
-$runspacePool = [System.Management.Automation.Runspaces.RunspacePool]::CreateRunspacePool(1, 50)
+$runspacePool = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspacePool(1, 50)
 $runspacePool.Open()
 $runspaces = [System.Collections.ArrayList]::new()
 
