@@ -1,0 +1,8 @@
+# Runtime
+proxy.log
+tinyproxy.conf
+tinyproxy.pid
+
+# Python
+__pycache__/
+*.pyc
