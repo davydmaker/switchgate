@@ -16,10 +16,15 @@ function Write-Log {
 
 function Get-LocalIP {
     try {
-        $ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-               Where-Object { $_.IPAddress -ne "127.0.0.1" -and $_.PrefixOrigin -ne "WellKnown" } |
-               Select-Object -First 1).IPAddress
-        return $ip
+        $adapters = Get-NetAdapter -Physical -ErrorAction SilentlyContinue |
+            Where-Object { $_.Status -eq "Up" }
+        foreach ($adapter in $adapters) {
+            $ip = (Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+                   Where-Object { $_.IPAddress -ne "127.0.0.1" } |
+                   Select-Object -First 1).IPAddress
+            if ($ip) { return $ip }
+        }
+        return $null
     } catch {
         return $null
     }
@@ -220,6 +225,17 @@ Add-FirewallRule
 if (Test-Path $LogFile) { Remove-Item $LogFile }
 New-Item -Path $LogFile -ItemType File -Force | Out-Null
 
+$existingPid = (Get-NetTCPConnection -LocalPort $ProxyPort -ErrorAction SilentlyContinue |
+    Where-Object { $_.State -eq "Listen" } |
+    Select-Object -First 1).OwningProcess
+if ($existingPid) {
+    $proc = Get-Process -Id $existingPid -ErrorAction SilentlyContinue
+    Write-Host "Port $ProxyPort is in use by process '$($proc.ProcessName)' (PID $existingPid)." -ForegroundColor Yellow
+    Write-Host "Killing it to free the port..." -ForegroundColor Yellow
+    Stop-Process -Id $existingPid -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+}
+
 $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $ProxyPort)
 
 try {
@@ -233,31 +249,48 @@ try {
 Write-Log "Proxy started on port $ProxyPort" "Green"
 Show-SwitchConfig
 
-$runspacePool = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspacePool(1, 50)
-$runspacePool.Open()
 $runspaces = [System.Collections.ArrayList]::new()
+$lastLogLine = 0
 
 Write-Host "Monitoring connections (Ctrl+C to exit):" -ForegroundColor Cyan
 Write-Host "=================================================="
 
 try {
     while ($true) {
+        # Show new log entries in terminal
+        if (Test-Path $LogFile) {
+            $lines = @(Get-Content -Path $LogFile -ErrorAction SilentlyContinue)
+            if ($lines.Count -gt $lastLogLine) {
+                for ($i = $lastLogLine; $i -lt $lines.Count; $i++) {
+                    if ($lines[$i] -match "ERROR") {
+                        Write-Host $lines[$i] -ForegroundColor Red
+                    } else {
+                        Write-Host $lines[$i] -ForegroundColor Gray
+                    }
+                }
+                $lastLogLine = $lines.Count
+            }
+        }
+
         if ($listener.Pending()) {
             $client = $listener.AcceptTcpClient()
 
-            $ps = [PowerShell]::Create()
-            $ps.RunspacePool = $runspacePool
+            $runspace = [runspacefactory]::CreateRunspace()
+            $runspace.Open()
+            $ps = [powershell]::Create()
+            $ps.Runspace = $runspace
             $ps.AddScript($proxyHandler).
                 AddArgument($client).
                 AddArgument($LogFile).
                 AddArgument($BufferSize) | Out-Null
             $handle = $ps.BeginInvoke()
-            $runspaces.Add(@{ PowerShell = $ps; Handle = $handle }) | Out-Null
+            $runspaces.Add(@{ PowerShell = $ps; Handle = $handle; Runspace = $runspace }) | Out-Null
 
             $completed = @($runspaces | Where-Object { $_.Handle.IsCompleted })
             foreach ($r in $completed) {
                 $r.PowerShell.EndInvoke($r.Handle)
                 $r.PowerShell.Dispose()
+                $r.Runspace.Dispose()
                 $runspaces.Remove($r)
             }
         }
@@ -270,8 +303,7 @@ try {
     foreach ($r in $runspaces) {
         $r.PowerShell.Stop()
         $r.PowerShell.Dispose()
+        $r.Runspace.Dispose()
     }
-    $runspacePool.Close()
-    $runspacePool.Dispose()
     Write-Host "Proxy stopped." -ForegroundColor Green
 }
